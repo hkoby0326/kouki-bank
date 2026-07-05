@@ -104,6 +104,9 @@ textarea{width:100%; height:110px; font-family:monospace; font-size:11px; border
 @keyframes pop{0%{transform:scale(.5);}70%{transform:scale(1.15);}100%{transform:scale(1);}}
 @media (prefers-reduced-motion: reduce){ .coin{animation:none;} }
 </style>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 </head>
 <body>
 <div class="wrap" id="app"></div>
@@ -188,6 +191,63 @@ function buildMarket(uptoDay){
 }
 function priceOf(id, day){const m=buildMarket(Math.max(day, dayIndex(todayStr())));return m.prices[id][Math.max(0,day)];}
 
+/* ================= クラウド同期 (Firebase) ================= */
+const FB_CONFIG={
+  apiKey:"AIzaSyAp5nLyEAHl9lrM1Ix9I8JBEsdd5p9_etQ",
+  authDomain:"kouki-bank.firebaseapp.com",
+  projectId:"kouki-bank",
+  storageBucket:"kouki-bank.firebasestorage.app",
+  messagingSenderId:"975506551099",
+  appId:"1:975506551099:web:752dfc5c01e683ff6f871e"
+};
+const FAMILY_KEY="kouki-bank-family";
+let fbDoc=null, saveTimer=null, syncStatus="接続中…";
+function familyCode(){
+  let c=localStorage.getItem(FAMILY_KEY);
+  if(!c){
+    const chars="abcdefghjkmnpqrstuvwxyz23456789";
+    c=Array.from(crypto.getRandomValues(new Uint8Array(14))).map(b=>chars[b%chars.length]).join("");
+    localStorage.setItem(FAMILY_KEY,c);
+  }
+  return c;
+}
+function initSync(){
+  return new Promise(resolve=>{
+    let done=false; const fin=()=>{if(!done){done=true;resolve();}};
+    try{
+      if(typeof firebase==="undefined")throw new Error("no sdk");
+      firebase.initializeApp(FB_CONFIG);
+      firebase.auth().signInAnonymously().then(()=>{
+        const db=firebase.firestore();
+        fbDoc=db.collection("families").doc(familyCode());
+        fbDoc.onSnapshot(snap=>{
+          if(snap.metadata.hasPendingWrites){fin();return;}
+          const remote=snap.exists?snap.data():null;
+          if(remote){
+            const localEmpty = S.tx.length===0 && S.wallet===0 && S.savings===0;
+            if(localEmpty || !S.updatedAt || remote.updatedAt>S.updatedAt){
+              S=remote;
+              localStorage.setItem(LS_KEY,JSON.stringify(S));
+              if(done)render();
+            }
+          }
+          syncStatus="同期OK ☁️";
+          fin();
+        },err=>{syncStatus="オフライン(端末内保存)";fin();});
+      }).catch(()=>{syncStatus="オフライン(端末内保存)";fin();});
+      setTimeout(fin,6000); // 保険: 6秒で諦めてローカル動作
+    }catch(e){syncStatus="オフライン(端末内保存)";fin();}
+  });
+}
+window.joinFamily=function(){
+  const v=document.getElementById("famIn").value.trim();
+  if(!/^[a-z2-9]{10,20}$/.test(v)){alert("家族コードの形式が不正です");return;}
+  if(!confirm("この端末のデータを捨てて、コード「"+v+"」のデータに接続します。よろしいですか?"))return;
+  localStorage.setItem(FAMILY_KEY,v);
+  localStorage.removeItem(LS_KEY);
+  location.reload();
+};
+
 /* ================= 状態 ================= */
 let S = null;
 function defaultState(){
@@ -204,7 +264,11 @@ function load(){
   try{const raw=localStorage.getItem(LS_KEY); S = raw?JSON.parse(raw):defaultState();}
   catch(e){S=defaultState();}
 }
-function save(){localStorage.setItem(LS_KEY, JSON.stringify(S));}
+function save(){
+  S.updatedAt=Date.now();
+  localStorage.setItem(LS_KEY, JSON.stringify(S));
+  if(fbDoc){clearTimeout(saveTimer);saveTimer=setTimeout(()=>{fbDoc.set(JSON.parse(JSON.stringify(S))).then(()=>{syncStatus="同期OK ☁️";}).catch(()=>{syncStatus="オフライン(端末内保存)";});},600);}
+}
 function addTx(date,type,ico,memo,amt){S.tx.unshift({id:S.nextId++,date,type,ico,memo,amt,cancelled:false});if(S.tx.length>400)S.tx.length=400;}
 
 /* ================= 日次キャッチアップ処理 ================= */
@@ -625,6 +689,16 @@ function renderParent(){
       </div>`).join("")}
   </div>
   <div class="card">
+    <h2>☁️ クラウド同期</h2>
+    <div class="settingline"><span class="grow">状態</span><span class="pill ${syncStatus.includes('OK')?'gold':''}">${syncStatus}</span></div>
+    <div class="settingline"><span class="grow">家族コード</span><b style="font-family:monospace; font-size:14px; user-select:all;">${familyCode()}</b></div>
+    <div class="small" style="margin:8px 0;">別の端末(親のスマホ等)で同じデータを使うには、その端末でこのアプリを開き、下の欄にこのコードを入力してください。コードを知っている人は誰でも操作できるので、家族以外に教えないこと。</div>
+    <div class="row">
+      <input type="text" id="famIn" placeholder="家族コードを入力して接続" style="font-size:14px;">
+      <button onclick="joinFamily()">接続</button>
+    </div>
+  </div>
+  <div class="card">
     <h2>💾 バックアップ</h2>
     <div class="small">localStorage保存のため、ブラウザデータ削除で消えます。定期的にエクスポート推奨。</div>
     <div class="row" style="margin:10px 0;">
@@ -678,8 +752,8 @@ window.closeModal=function(){modalRoot.innerHTML="";};
 /* ================= 起動 ================= */
 load();
 buildMarket(dayIndex(todayStr()));
-processDays();
 render();
+initSync().then(()=>{processDays();render();});
 </script>
 </body>
 </html>
