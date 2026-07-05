@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>こうきぎんこう</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#22335B; --bg:#EAF4FB; --card:#FFFFFF;
+  --gold:#F5B301; --green:#1E9E5A; --red:#E4572E;
+  --blue:#3E7BFA; --pink:#F27A9E; --line:#22335B;
+  --muted:#7A87A6;
+}
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+body{
+  margin:0; background:var(--bg); color:var(--ink);
+  font-family:'Zen Maru Gothic', 'Hiragino Maru Gothic ProN', sans-serif;
+  font-weight:700; padding-bottom:90px;
+}
+.wrap{max-width:620px; margin:0 auto; padding:16px;}
+.card{
+  background:var(--card); border:3px solid var(--line); border-radius:20px;
+  padding:16px; margin-bottom:14px; box-shadow:4px 4px 0 rgba(34,51,91,.15);
+}
+h1{font-size:22px; font-weight:900; margin:8px 0 14px;}
+h2{font-size:17px; font-weight:900; margin:0 0 10px;}
+.small{font-size:12px; color:var(--muted); font-weight:700;}
+.big-amount{font-size:40px; font-weight:900; letter-spacing:1px;}
+.mid-amount{font-size:24px; font-weight:900;}
+.pos{color:var(--green);} .neg{color:var(--red);}
+button{
+  font-family:inherit; font-weight:900; font-size:16px; color:var(--ink);
+  background:#fff; border:3px solid var(--line); border-radius:16px;
+  padding:12px 16px; cursor:pointer; box-shadow:3px 3px 0 rgba(34,51,91,.2);
+}
+button:active{transform:translate(2px,2px); box-shadow:1px 1px 0 rgba(34,51,91,.2);}
+button.primary{background:var(--gold);}
+button.green{background:#CDEEDB;}
+button.red{background:#FBDCD2;}
+button.ghost{border-color:#C6D2E6; box-shadow:none; color:var(--muted);}
+button:disabled{opacity:.4; pointer-events:none;}
+.row{display:flex; gap:10px; align-items:center;}
+.row.wrapme{flex-wrap:wrap;}
+.grow{flex:1;}
+input[type=number], input[type=text], input[type=password], select{
+  font-family:inherit; font-weight:900; font-size:20px; color:var(--ink);
+  border:3px solid var(--line); border-radius:14px; padding:10px 12px; width:100%;
+  background:#fff;
+}
+.tabbar{
+  position:fixed; left:0; right:0; bottom:0; background:#fff;
+  border-top:3px solid var(--line); display:flex; z-index:50;
+}
+.tabbar button{
+  flex:1; border:none; border-radius:0; box-shadow:none; background:#fff;
+  padding:10px 0 12px; font-size:11px; color:var(--muted);
+}
+.tabbar button .ico{display:block; font-size:24px; margin-bottom:2px;}
+.tabbar button.on{color:var(--ink); background:#FFF3D0;}
+.pill{
+  display:inline-block; border:2px solid var(--line); border-radius:999px;
+  padding:2px 10px; font-size:12px; font-weight:900; background:#fff;
+}
+.pill.gold{background:var(--gold);}
+.pill.blue{background:#D8E5FF;}
+.txline{
+  display:flex; align-items:center; gap:10px; padding:10px 4px;
+  border-bottom:2px dashed #D5DEEC;
+}
+.txline:last-child{border-bottom:none;}
+.txico{font-size:22px; width:30px; text-align:center;}
+.txmemo{flex:1; font-size:14px;}
+.txamt{font-size:16px; font-weight:900; white-space:nowrap;}
+.newsline{display:flex; gap:8px; padding:8px 2px; border-bottom:2px dashed #D5DEEC; font-size:13px; align-items:flex-start;}
+.newsline:last-child{border-bottom:none;}
+.stockcard{cursor:pointer;}
+.chartbox{background:#F4F8FE; border:2px solid #C6D2E6; border-radius:14px; padding:8px;}
+.hint{
+  background:#FFF6DC; border:2px dashed var(--gold); border-radius:14px;
+  padding:10px 12px; font-size:13px; margin-top:10px;
+}
+.centered{text-align:center;}
+.numpadrow{display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:10px;}
+.legend{display:flex; flex-wrap:wrap; gap:8px; font-size:12px; margin-top:8px;}
+.legend span{display:flex; align-items:center; gap:4px;}
+.dot{width:12px; height:12px; border-radius:4px; border:2px solid var(--line); display:inline-block;}
+.overlay{
+  position:fixed; inset:0; background:rgba(34,51,91,.45); z-index:100;
+  display:flex; align-items:center; justify-content:center; padding:20px;
+}
+.modal{background:#fff; border:3px solid var(--line); border-radius:20px; padding:18px; width:100%; max-width:420px; max-height:85vh; overflow-y:auto;}
+.settingline{display:flex; align-items:center; gap:10px; padding:12px 0; border-bottom:2px dashed #D5DEEC;}
+.settingline:last-child{border-bottom:none;}
+.toggle{width:56px; height:32px; border-radius:999px; border:3px solid var(--line); background:#E5EAF3; position:relative; padding:0;}
+.toggle .knob{position:absolute; top:2px; left:3px; width:22px; height:22px; border-radius:50%; background:#fff; border:2px solid var(--line); transition:left .15s;}
+.toggle.on{background:var(--green);}
+.toggle.on .knob{left:26px;}
+.badge-up{color:var(--green); font-weight:900;}
+.badge-down{color:var(--red); font-weight:900;}
+textarea{width:100%; height:110px; font-family:monospace; font-size:11px; border:2px solid var(--line); border-radius:10px; padding:8px;}
+.coin{display:inline-block; animation:pop .4s ease;}
+@keyframes pop{0%{transform:scale(.5);}70%{transform:scale(1.15);}100%{transform:scale(1);}}
+@media (prefers-reduced-motion: reduce){ .coin{animation:none;} }
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<div class="tabbar" id="tabbar"></div>
+<div id="modalRoot"></div>
+
+<script>
+"use strict";
+/* ================= 定数・銘柄 ================= */
+const LS_KEY = "kouki-bank-v1";
+const EPOCH = "2026-01-05"; // 月曜日(価格シミュレーション起点)
+const FEE_RATE = 0.01;
+const DIV_CYCLE = 28; // 配当: 28日ごと
+
+const STOCKS = [
+  {id:"train", name:"でんしゃ鉄道", emoji:"🚃", base:500, drift:0.0009, vol:0.008,
+   divPct:2.0, desc:"まいにち たくさんの人をはこぶ電車の会社。大きくはのびないけど、とても安定していて、4週間ごとに「はいとう」(お礼のお金)がもらえるよ。",
+   goodNews:["新しい路線ができて お客さんが ふえた!","電車の色がかわいくなって 大人気!","駅ビルが オープンして もうかった!"],
+   badNews:["台風で 電車が とまってしまった…","電気代が 上がって たいへん…","お客さんが すこし へってしまった…"]},
+  {id:"fish", name:"おさかな水産", emoji:"🐟", base:300, drift:0.0011, vol:0.014,
+   divPct:1.5, desc:"おいしい魚をとって 売る会社。海のようすで もうかったり もうからなかったり。4週間ごとに「はいとう」がもらえるよ。",
+   goodNews:["大りょう! 魚が たくさん とれた!","おさかな水産のマグロが 高く売れた!","新しい船を買って もっと 魚がとれるように!"],
+   badNews:["あらしで 漁に 出られなかった…","魚が あまり とれなかった…","船のしゅうりで お金がかかった…"]},
+  {id:"game", name:"ゲームスタジオ", emoji:"🎮", base:200, drift:0.0014, vol:0.028,
+   divPct:0, desc:"ゲームを作る会社。ヒット作が出ると 株がグーンと上がるけど、うまくいかないと ドーンと下がる。はいとうは ないよ。",
+   goodNews:["新作ゲームが 大ヒット!!","ゲーム大会で ゆうしょうしゃが 話題に!","海外でも ゲームが 売れはじめた!"],
+   badNews:["新作ゲームの はつばいが おくれた…","バグが見つかって なおすのに ひっし…","ライバル会社のゲームに まけた…"]},
+  {id:"robot", name:"ロボット研究所", emoji:"🤖", base:150, drift:0.0017, vol:0.040,
+   divPct:0, desc:"みらいのロボットを作る会社。夢は大きいけど、まだ もうかっていない。株の うごきは 一番はげしいよ。はいとうは ないよ。",
+   goodNews:["すごいロボットの 発明に せいこう!!","国から けんきゅうのお金を もらえた!","ロボットがテレビで しょうかいされた!"],
+   badNews:["じっけんが しっぱいしてしまった…","けんきゅうのお金が たりない…","ロボットが うまく うごかない…"]}
+];
+
+/* ================= 乱数(シード付き・決定的) ================= */
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;}}
+function rand1(seed){const g=mulberry32(seed);g();g();g();g();return g();}
+
+/* ================= 日付ユーティリティ ================= */
+function todayStr(){const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");}
+function toUTC(s){const[y,m,d]=s.split("-").map(Number);return Date.UTC(y,m-1,d);}
+function dayIndex(s){return Math.round((toUTC(s)-toUTC(EPOCH))/86400000);}
+function dateOfIndex(i){const d=new Date(toUTC(EPOCH)+i*86400000);return d.getUTCFullYear()+"-"+String(d.getUTCMonth()+1).padStart(2,"0")+"-"+String(d.getUTCDate()).padStart(2,"0");}
+function isMonday(i){return ((i%7)+7)%7===0;} // EPOCHが月曜
+function fmtDate(s){const[,m,d]=s.split("-");return Number(m)+"/"+Number(d);}
+function yen(n){return "¥"+Math.round(n).toLocaleString();}
+
+/* ================= 株価シミュレーション(決定的) =================
+   イベント日: 各日 seed 555000+d で 2/7 の確率で発生、対象銘柄と良悪を決定
+   暴落日:    seed 999000+d で 0.7% の確率 → 全銘柄 -15〜-28%
+   通常変動:  seed (銘柄idx+1)*100000+d                                   */
+let priceCache = null; // {upto, prices:{id:[...]}, events:[{day,stockIdx,good,headlineIdx,pct}], crashes:[{day,pct}]}
+function buildMarket(uptoDay){
+  if(priceCache && priceCache.upto>=uptoDay) return priceCache;
+  const prices={}, events=[], crashes=[];
+  STOCKS.forEach(s=>prices[s.id]=[s.base]);
+  for(let d=1; d<=uptoDay; d++){
+    const crashR = rand1(999000+d);
+    const isCrash = crashR < 0.005;
+    let crashPct=0;
+    if(isCrash){ crashPct = -(0.10+rand1(999500+d)*0.08); crashes.push({day:d, pct:crashPct}); }
+    const evR = mulberry32(555000+d);evR();evR();evR();evR();
+    const hasEvent = !isCrash && evR() < (2/7);
+    let evStock=-1, evGood=false, evPct=0, evHead=0;
+    if(hasEvent){
+      evStock = Math.floor(evR()*STOCKS.length);
+      evGood = evR() < 0.5;
+      evPct = (0.03+evR()*0.06) * (evGood?1:-1);
+      evHead = Math.floor(evR()*3);
+      events.push({day:d, stockIdx:evStock, good:evGood, headlineIdx:evHead, pct:evPct});
+    }
+    STOCKS.forEach((s,idx)=>{
+      const r = rand1((idx+1)*100000+d);
+      let ret = s.drift + (r-0.5)*2*s.vol;
+      if(isCrash) ret += crashPct;
+      if(evStock===idx) ret += evPct;
+      const prev = prices[s.id][d-1];
+      prices[s.id][d] = Math.max(10, Math.round(prev*(1+ret)));
+    });
+  }
+  priceCache = {upto:uptoDay, prices, events, crashes};
+  return priceCache;
+}
+function priceOf(id, day){const m=buildMarket(Math.max(day, dayIndex(todayStr())));return m.prices[id][Math.max(0,day)];}
+
+/* ================= 状態 ================= */
+let S = null;
+function defaultState(){
+  return {
+    pin:"1234", wallet:0, savings:0,
+    weeklyAllowance:500, allowanceOn:true, weeklyRatePct:0.5,
+    lastProcessed: todayStr(),
+    tx:[], holdings:{}, // holdings[id]={shares,cost}
+    tsumitate:{on:false, stock:"train", shares:1},
+    totalInterest:0, totalDividend:0, nextId:1
+  };
+}
+function load(){
+  try{const raw=localStorage.getItem(LS_KEY); S = raw?JSON.parse(raw):defaultState();}
+  catch(e){S=defaultState();}
+}
+function save(){localStorage.setItem(LS_KEY, JSON.stringify(S));}
+function addTx(date,type,ico,memo,amt){S.tx.unshift({id:S.nextId++,date,type,ico,memo,amt,cancelled:false});if(S.tx.length>400)S.tx.length=400;}
+
+/* ================= 日次キャッチアップ処理 ================= */
+function processDays(){
+  const today = todayStr();
+  let d = dayIndex(S.lastProcessed);
+  const end = dayIndex(today);
+  if(end<=d){S.lastProcessed=today;return;}
+  for(let i=d+1;i<=end;i++){
+    const ds = dateOfIndex(i);
+    if(isMonday(i)){
+      if(S.allowanceOn && S.weeklyAllowance>0){
+        S.wallet += S.weeklyAllowance;
+        addTx(ds,"allowance","💰","こんしゅうのおこづかい",S.weeklyAllowance);
+      }
+      if(S.savings>0 && S.weeklyRatePct>0){
+        const it = Math.floor(S.savings*S.weeklyRatePct/100);
+        if(it>0){S.savings+=it;S.totalInterest+=it;addTx(ds,"interest","✨","ちょきんの りし",it);}
+      }
+      if(S.tsumitate.on){
+        const st=STOCKS.find(x=>x.id===S.tsumitate.stock);
+        const p=priceOf(st.id,i), n=S.tsumitate.shares;
+        const cost=p*n, fee=Math.max(1,Math.ceil(cost*FEE_RATE));
+        if(S.wallet>=cost+fee){
+          S.wallet-=(cost+fee);
+          const h=S.holdings[st.id]||{shares:0,cost:0};
+          h.shares+=n; h.cost+=cost+fee; S.holdings[st.id]=h;
+          addTx(ds,"buy",st.emoji,"つみたて "+st.name+" "+n+"かぶ (てすうりょう"+yen(fee)+")",-(cost+fee));
+        }
+      }
+    }
+    if(i>0 && i%DIV_CYCLE===0){
+      STOCKS.forEach(st=>{
+        if(st.divPct<=0)return;
+        const h=S.holdings[st.id];
+        if(h&&h.shares>0){
+          const dv=Math.floor(h.shares*priceOf(st.id,i)*st.divPct/100);
+          if(dv>0){S.wallet+=dv;S.totalDividend+=dv;addTx(ds,"dividend","🎁",st.name+"の はいとう",dv);}
+        }
+      });
+    }
+  }
+  S.lastProcessed = today;
+  save();
+}
+
+/* ================= 計算ヘルパー ================= */
+function stockValue(){const t=dayIndex(todayStr());let v=0;for(const id in S.holdings){v+=S.holdings[id].shares*priceOf(id,t);}return v;}
+function totalAssets(){return S.wallet+S.savings+stockValue();}
+function nextMondayStr(){let i=dayIndex(todayStr())+1;while(!isMonday(i))i++;return dateOfIndex(i);}
+function nextDivStr(){let i=dayIndex(todayStr())+1;while(i%DIV_CYCLE!==0)i++;return dateOfIndex(i);}
+function recentNews(n){
+  const t=dayIndex(todayStr());const m=buildMarket(t);const out=[];
+  for(let d=t;d>=Math.max(1,t-13)&&out.length<n;d--){
+    m.crashes.filter(c=>c.day===d).forEach(c=>out.push({date:dateOfIndex(d),ico:"🌩️",text:"たいへん! 世界中で 株が いっせいに下がった!("+Math.round(c.pct*100)+"%)"}));
+    m.events.filter(e=>e.day===d).forEach(e=>{
+      const st=STOCKS[e.stockIdx];
+      const head=(e.good?st.goodNews:st.badNews)[e.headlineIdx];
+      out.push({date:dateOfIndex(d),ico:st.emoji,text:head+(e.good?" 📈":" 📉")});
+    });
+  }
+  return out.slice(0,n);
+}
+
+/* ================= 画面描画 ================= */
+let TAB="home", DETAIL=null, PARENT=false;
+const app=document.getElementById("app");
+const tabbar=document.getElementById("tabbar");
+const modalRoot=document.getElementById("modalRoot");
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
+
+function render(){
+  renderTabs();
+  if(PARENT){renderParent();return;}
+  if(TAB==="home")renderHome();
+  else if(TAB==="book")renderBook();
+  else if(TAB==="save")renderSave();
+  else if(TAB==="stock")renderStock();
+}
+function renderTabs(){
+  const tabs=[["home","🏠","ホーム"],["book","📖","おこづかい帳"],["save","🐷","ちょきん"],["stock","📈","かぶ"],["parent","🔒","おうちの人"]];
+  tabbar.innerHTML=tabs.map(t=>
+    `<button class="${(!PARENT&&TAB===t[0])||(PARENT&&t[0]==='parent')?'on':''}" onclick="goTab('${t[0]}')"><span class="ico">${t[1]}</span>${t[2]}</button>`).join("");
+}
+window.goTab=function(t){
+  if(t==="parent"){openPinModal();return;}
+  PARENT=false;TAB=t;DETAIL=null;render();
+};
+
+/* ---------- ホーム ---------- */
+function renderHome(){
+  const news=recentNews(4);
+  const sv=stockValue();
+  app.innerHTML=`
+  <h1>🏦 こうき ぎんこう</h1>
+  <div class="card centered" style="background:#FFF9E8;">
+    <div class="small">こうきの ぜんぶのお金</div>
+    <div class="big-amount"><span class="coin">🪙</span> ${yen(totalAssets())}</div>
+  </div>
+  <div class="row">
+    <div class="card grow centered" onclick="goTab('book')">
+      <div style="font-size:26px;">👛</div><div class="small">さいふ</div>
+      <div class="mid-amount">${yen(S.wallet)}</div>
+    </div>
+    <div class="card grow centered" onclick="goTab('save')">
+      <div style="font-size:26px;">🐷</div><div class="small">ちょきん</div>
+      <div class="mid-amount">${yen(S.savings)}</div>
+    </div>
+    <div class="card grow centered" onclick="goTab('stock')">
+      <div style="font-size:26px;">📈</div><div class="small">かぶ</div>
+      <div class="mid-amount">${yen(sv)}</div>
+    </div>
+  </div>
+  <div class="card">
+    <h2>📅 つぎのよてい</h2>
+    <div class="txline"><span class="txico">💰</span><span class="txmemo">おこづかい ${S.allowanceOn?yen(S.weeklyAllowance):"(おやすみ中)"}</span><span class="pill blue">${fmtDate(nextMondayStr())} 月よう日</span></div>
+    <div class="txline"><span class="txico">✨</span><span class="txmemo">ちょきんの りし</span><span class="pill blue">${fmtDate(nextMondayStr())} 月よう日</span></div>
+    <div class="txline"><span class="txico">🎁</span><span class="txmemo">かぶの はいとう</span><span class="pill blue">${fmtDate(nextDivStr())}</span></div>
+  </div>
+  <div class="card">
+    <h2>📰 けいざいニュース</h2>
+    ${news.length?news.map(n=>`<div class="newsline"><span>${n.ico}</span><span class="grow">${esc(n.text)}</span><span class="small">${fmtDate(n.date)}</span></div>`).join(""):'<div class="small">きょうは ニュースが ないよ</div>'}
+    <div class="hint">💡 かぶの ねだんは、こういう ニュースで 上がったり下がったり するんだよ。</div>
+  </div>`;
+}
+
+/* ---------- おこづかい帳 ---------- */
+function renderBook(){
+  const list=S.tx.filter(t=>!t.cancelled).slice(0,60);
+  app.innerHTML=`
+  <h1>📖 おこづかい帳</h1>
+  <div class="card">
+    ${list.length?list.map(t=>`
+      <div class="txline">
+        <span class="txico">${t.ico}</span>
+        <span class="txmemo">${esc(t.memo)}<br><span class="small">${fmtDate(t.date)}</span></span>
+        <span class="txamt ${t.amt>0?'pos':t.amt<0?'neg':''}">${t.amt===0?"↔":(t.amt>0?"+":"")+yen(t.amt)}</span>
+      </div>`).join(""):'<div class="small centered">まだ なにも ないよ。おこづかいを まっててね!</div>'}
+  </div>`;
+}
+
+/* ---------- ちょきん ---------- */
+function renderSave(){
+  const weekly=Math.floor(S.savings*S.weeklyRatePct/100);
+  app.innerHTML=`
+  <h1>🐷 ちょきん</h1>
+  <div class="card centered" style="background:#FDEFF4;">
+    <div style="font-size:44px;">🐷</div>
+    <div class="small">ちょきんばこ の中</div>
+    <div class="big-amount">${yen(S.savings)}</div>
+    <div class="small" style="margin-top:6px;">いままでもらった りし: <b class="pos">${yen(S.totalInterest)}</b></div>
+  </div>
+  <div class="row">
+    <button class="primary grow" onclick="openMoveModal('in')">👛→🐷 あずける</button>
+    <button class="grow" onclick="openMoveModal('out')">🐷→👛 おろす</button>
+  </div>
+  <div class="card" style="margin-top:14px;">
+    <h2>✨ りし って なに?</h2>
+    <div style="font-size:14px; line-height:1.7;">
+      お金を ちょきんばこに あずけておくと、<b>月よう日ごとに ${S.weeklyRatePct}% </b>お金が ふえるよ。<br>
+      いまの ちょきんだと、つぎの月よう日に <b class="pos">+${yen(weekly)}</b> もらえる!<br>
+      <b>お金が お金を つれてくる</b>んだ。
+    </div>
+    <div class="hint">🏦 ほんものの 銀行の りしは、1年で 0.2% くらい。このアプリは べんきょうのために とくべつ たくさん もらえるよ。</div>
+  </div>`;
+}
+window.openMoveModal=function(dir){
+  const max=dir==="in"?S.wallet:S.savings;
+  openModal(`
+    <h2>${dir==="in"?"🐷に あずける":"👛に おろす"}</h2>
+    <div class="small">${dir==="in"?"さいふ":"ちょきん"}に ${yen(max)} あるよ</div>
+    <input type="number" id="mvAmt" placeholder="いくら?" min="1" max="${max}" style="margin-top:10px;">
+    <div class="numpadrow">
+      ${[100,500,1000].map(v=>`<button onclick="document.getElementById('mvAmt').value=${v}">${yen(v)}</button>`).join("")}
+    </div>
+    <div class="row" style="margin-top:14px;">
+      <button class="ghost grow" onclick="closeModal()">やめる</button>
+      <button class="primary grow" onclick="doMove('${dir}')">けってい</button>
+    </div>`);
+};
+window.doMove=function(dir){
+  const a=Math.floor(Number(document.getElementById("mvAmt").value));
+  if(!a||a<=0)return;
+  const d=todayStr();
+  if(dir==="in"){
+    if(a>S.wallet){alert("さいふのお金が たりないよ");return;}
+    S.wallet-=a;S.savings+=a;addTx(d,"deposit","🐷","ちょきんに あずけた",-0);
+    S.tx[0].memo="ちょきんに あずけた "+yen(a);S.tx[0].amt=0;S.tx[0].moveAmt=a;S.tx[0].dir="in";
+  }else{
+    if(a>S.savings){alert("ちょきんが たりないよ");return;}
+    S.savings-=a;S.wallet+=a;addTx(d,"withdraw","👛","ちょきんから おろした "+yen(a),0);S.tx[0].moveAmt=a;S.tx[0].dir="out";
+  }
+  save();closeModal();render();
+};
+
+/* ---------- かぶ ---------- */
+function renderStock(){
+  if(DETAIL){renderStockDetail(DETAIL);return;}
+  const t=dayIndex(todayStr());
+  const sv=stockValue();
+  let totalCost=0;for(const id in S.holdings)totalCost+=S.holdings[id].cost;
+  const pl=sv-totalCost;
+  app.innerHTML=`
+  <h1>📈 かぶ</h1>
+  <div class="card centered">
+    <div class="small">もっている かぶ ぜんぶで</div>
+    <div class="big-amount">${yen(sv)}</div>
+    ${totalCost>0?`<div class="small">かったときより <b class="${pl>=0?'pos':'neg'}">${pl>=0?"+":""}${yen(pl)}</b></div>`:""}
+  </div>
+  ${renderPie()}
+  <h2 style="margin:16px 4px 8px;">かいしゃ いちらん</h2>
+  ${STOCKS.map(st=>{
+    const p=priceOf(st.id,t), py=priceOf(st.id,t-1);
+    const diff=p-py, pct=py?(diff/py*100).toFixed(1):"0.0";
+    const h=S.holdings[st.id];
+    return `<div class="card stockcard" onclick="openDetail('${st.id}')">
+      <div class="row">
+        <span style="font-size:30px;">${st.emoji}</span>
+        <div class="grow">
+          <div style="font-weight:900;">${st.name} ${st.divPct>0?'<span class="pill gold">はいとう</span>':""}</div>
+          <div class="small">${h&&h.shares>0?h.shares+"かぶ もってる":"もっていない"}</div>
+        </div>
+        <div style="text-align:right;">
+          <div class="mid-amount">${yen(p)}</div>
+          <div class="${diff>=0?'badge-up':'badge-down'}">${diff>=0?"▲":"▼"} ${yen(Math.abs(diff))} (${pct}%)</div>
+        </div>
+      </div>
+    </div>`;
+  }).join("")}
+  ${S.tsumitate.on?`<div class="hint">🔁 つみたて中: まいしゅう月よう日に ${STOCKS.find(x=>x.id===S.tsumitate.stock).name} を ${S.tsumitate.shares}かぶ かうよ</div>`:""}
+  <div class="hint">⚠️ かぶは 上がることも 下がることも あるよ。かうとき・うるときに <b>てすうりょう1%</b> が かかるから、なんども うりかい すると そんを するよ。</div>`;
+}
+function renderPie(){
+  const t=dayIndex(todayStr());
+  const parts=[{label:"さいふ",v:S.wallet,color:"#F5B301"},{label:"ちょきん",v:S.savings,color:"#F27A9E"}];
+  STOCKS.forEach((st,i)=>{const h=S.holdings[st.id];if(h&&h.shares>0)parts.push({label:st.name,v:h.shares*priceOf(st.id,t),color:["#3E7BFA","#1E9E5A","#8B5CF6","#E4572E"][i]});});
+  const total=parts.reduce((a,b)=>a+b.v,0);
+  if(total<=0)return "";
+  let acc=0;const C=2*Math.PI*40;
+  const circles=parts.map(p=>{
+    const frac=p.v/total, dash=frac*C;
+    const el=`<circle r="40" cx="60" cy="60" fill="none" stroke="${p.color}" stroke-width="24" stroke-dasharray="${dash} ${C-dash}" stroke-dashoffset="${-acc*C+C/4}"></circle>`;
+    acc+=frac;return el;
+  }).join("");
+  return `<div class="card">
+    <h2>🥧 お金の わけかた</h2>
+    <div class="row">
+      <svg width="120" height="120" viewBox="0 0 120 120">${circles}</svg>
+      <div class="legend grow" style="flex-direction:column; align-items:flex-start;">
+        ${parts.map(p=>`<span><span class="dot" style="background:${p.color}"></span>${p.label} ${Math.round(p.v/total*100)}%</span>`).join("")}
+      </div>
+    </div>
+    <div class="hint">💡 ぜんぶを 1つの かぶに するより、いろいろに わけると あんしんだよ(ぶんさんとうし)。</div>
+  </div>`;
+}
+window.openDetail=function(id){DETAIL=id;render();};
+function renderStockDetail(id){
+  const st=STOCKS.find(x=>x.id===id);
+  const t=dayIndex(todayStr());
+  const p=priceOf(id,t), py=priceOf(id,t-1), diff=p-py;
+  const h=S.holdings[id]||{shares:0,cost:0};
+  const val=h.shares*p, pl=val-h.cost;
+  // 30日チャート
+  const days=30, from=Math.max(0,t-days+1);
+  const pts=[];let mn=Infinity,mx=-Infinity;
+  for(let d=from;d<=t;d++){const v=priceOf(id,d);pts.push(v);mn=Math.min(mn,v);mx=Math.max(mx,v);}
+  const pad=(mx-mn)*0.1||1;mn-=pad;mx+=pad;
+  const W=520,H=140;
+  const poly=pts.map((v,i)=>`${(i/(pts.length-1))*W},${H-((v-mn)/(mx-mn))*H}`).join(" ");
+  const isTsumi=S.tsumitate.on&&S.tsumitate.stock===id;
+  app.innerHTML=`
+  <button class="ghost" onclick="DETAIL=null;render();">← もどる</button>
+  <h1 style="margin-top:10px;">${st.emoji} ${st.name}</h1>
+  <div class="card">
+    <div class="row">
+      <div class="grow">
+        <div class="small">きょうの ねだん(1かぶ)</div>
+        <div class="big-amount">${yen(p)}</div>
+        <div class="${diff>=0?'badge-up':'badge-down'}">きのうから ${diff>=0?"▲":"▼"} ${yen(Math.abs(diff))}</div>
+      </div>
+      ${st.divPct>0?`<span class="pill gold">はいとう ${st.divPct}%<br>/4週</span>`:'<span class="pill">はいとう なし</span>'}
+    </div>
+    <div class="chartbox" style="margin-top:12px;">
+      <div class="small">この30日の うごき</div>
+      <svg width="100%" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="height:120px;">
+        <polyline points="${poly}" fill="none" stroke="${diff>=0?'#1E9E5A':'#E4572E'}" stroke-width="4" stroke-linejoin="round"/>
+      </svg>
+    </div>
+    <div style="font-size:13px; line-height:1.7; margin-top:10px;">${st.desc}</div>
+  </div>
+  <div class="card">
+    <h2>こうきの もちぶん</h2>
+    <div class="txline"><span class="txmemo">もっているかず</span><b>${h.shares}かぶ</b></div>
+    <div class="txline"><span class="txmemo">いまの ねうち</span><b>${yen(val)}</b></div>
+    ${h.shares>0?`<div class="txline"><span class="txmemo">かったときより</span><b class="${pl>=0?'pos':'neg'}">${pl>=0?"+":""}${yen(pl)}</b></div>`:""}
+  </div>
+  <div class="row">
+    <button class="green grow" onclick="openTrade('${id}','buy')">かう</button>
+    <button class="red grow" onclick="openTrade('${id}','sell')" ${h.shares>0?"":"disabled"}>うる</button>
+  </div>
+  <div class="hint" style="margin-top:12px;">🔁 <b>つみたて</b>: まいしゅう月よう日に じどうで このかぶを かうよ。すこしずつ ながく かうのが つよいんだ。
+    <div style="margin-top:8px;"><button class="${isTsumi?'red':'primary'}" onclick="toggleTsumi('${id}')">${isTsumi?"つみたてを やめる":"この かぶを つみたてる(週1かぶ)"}</button></div>
+  </div>`;
+}
+window.toggleTsumi=function(id){
+  if(S.tsumitate.on&&S.tsumitate.stock===id){S.tsumitate.on=false;}
+  else{S.tsumitate={on:true,stock:id,shares:1};}
+  save();render();
+};
+window.openTrade=function(id,mode){
+  const st=STOCKS.find(x=>x.id===id);
+  const t=dayIndex(todayStr()); const p=priceOf(id,t);
+  const h=S.holdings[id]||{shares:0,cost:0};
+  const maxBuy=Math.floor(S.wallet/(p*(1+FEE_RATE)));
+  const max=mode==="buy"?maxBuy:h.shares;
+  openModal(`
+    <h2>${st.emoji} ${st.name} を ${mode==="buy"?"かう":"うる"}</h2>
+    <div class="small">1かぶ = ${yen(p)} / ${mode==="buy"?"さいふ: "+yen(S.wallet):"もっている: "+h.shares+"かぶ"}</div>
+    <input type="number" id="trN" placeholder="なんかぶ?" min="1" max="${max}" value="1" style="margin-top:10px;" oninput="updTrade('${id}','${mode}')">
+    <div id="trInfo" class="hint"></div>
+    <div class="row" style="margin-top:12px;">
+      <button class="ghost grow" onclick="closeModal()">やめる</button>
+      <button class="${mode==='buy'?'green':'red'} grow" onclick="doTrade('${id}','${mode}')">${mode==="buy"?"かう!":"うる!"}</button>
+    </div>`);
+  window.updTrade(id,mode);
+};
+window.updTrade=function(id,mode){
+  const t=dayIndex(todayStr()); const p=priceOf(id,t);
+  const n=Math.floor(Number(document.getElementById("trN").value))||0;
+  const amt=p*n, fee=n>0?Math.max(1,Math.ceil(amt*FEE_RATE)):0;
+  document.getElementById("trInfo").innerHTML = n<=0?"かずを いれてね":
+    mode==="buy"
+    ?`だいきん ${yen(amt)} + てすうりょう ${yen(fee)} = <b>${yen(amt+fee)}</b> はらうよ`
+    :`だいきん ${yen(amt)} − てすうりょう ${yen(fee)} = <b>${yen(amt-fee)}</b> もらえるよ`;
+};
+window.doTrade=function(id,mode){
+  const st=STOCKS.find(x=>x.id===id);
+  const t=dayIndex(todayStr()); const p=priceOf(id,t);
+  const n=Math.floor(Number(document.getElementById("trN").value));
+  if(!n||n<=0)return;
+  const amt=p*n, fee=Math.max(1,Math.ceil(amt*FEE_RATE));
+  const h=S.holdings[id]||{shares:0,cost:0};
+  const d=todayStr();
+  if(mode==="buy"){
+    if(S.wallet<amt+fee){alert("さいふのお金が たりないよ");return;}
+    S.wallet-=(amt+fee); h.shares+=n; h.cost+=amt+fee; S.holdings[id]=h;
+    addTx(d,"buy",st.emoji,st.name+" "+n+"かぶ かった (てすうりょう"+yen(fee)+")",-(amt+fee));
+  }else{
+    if(h.shares<n){alert("そんなに もっていないよ");return;}
+    const costOut=Math.round(h.cost*(n/h.shares));
+    h.shares-=n; h.cost-=costOut; if(h.shares===0)h.cost=0; S.holdings[id]=h;
+    S.wallet+=(amt-fee);
+    addTx(d,"sell",st.emoji,st.name+" "+n+"かぶ うった (てすうりょう"+yen(fee)+")",amt-fee);
+  }
+  save();closeModal();render();
+};
+
+/* ---------- 親UI ---------- */
+function openPinModal(){
+  openModal(`
+    <h2>🔒 おうちの人 モード</h2>
+    <div class="small">PINをいれてください(初期値 1234)</div>
+    <input type="password" id="pinIn" inputmode="numeric" maxlength="4" style="margin-top:10px; letter-spacing:8px; text-align:center;">
+    <div class="row" style="margin-top:12px;">
+      <button class="ghost grow" onclick="closeModal()">やめる</button>
+      <button class="primary grow" onclick="checkPin()">ひらく</button>
+    </div>`);
+  setTimeout(()=>document.getElementById("pinIn").focus(),100);
+}
+window.checkPin=function(){
+  if(document.getElementById("pinIn").value===S.pin){PARENT=true;closeModal();render();}
+  else alert("PINが ちがいます");
+};
+function renderParent(){
+  app.innerHTML=`
+  <h1>🔧 管理画面(親用)</h1>
+  <div class="card">
+    <h2>💴 入金・出金</h2>
+    <div class="small">残高 = 親が航暉に支払う義務のある金額。使わせる時は「出金(現金化)」で減らす。</div>
+    <input type="number" id="pAmt" placeholder="金額" style="margin:10px 0;">
+    <input type="text" id="pMemo" placeholder="メモ(例: おてつだいボーナス / おもちゃ購入)" style="font-size:15px;">
+    <div class="row" style="margin-top:10px;">
+      <button class="green grow" onclick="parentMoney(1)">＋入金</button>
+      <button class="red grow" onclick="parentMoney(-1)">−出金(現金化)</button>
+    </div>
+  </div>
+  <div class="card">
+    <h2>⚙️ 設定</h2>
+    <div class="settingline">
+      <span class="grow">週次お小遣い(月曜)</span>
+      <button class="toggle ${S.allowanceOn?'on':''}" onclick="S.allowanceOn=!S.allowanceOn;save();render();"><span class="knob"></span></button>
+    </div>
+    <div class="settingline">
+      <span class="grow">お小遣い額</span>
+      <input type="number" value="${S.weeklyAllowance}" style="width:110px;" onchange="S.weeklyAllowance=Math.max(0,Math.floor(Number(this.value)||0));save();">
+      <span>円</span>
+    </div>
+    <div class="settingline">
+      <span class="grow">貯金利率(週次)</span>
+      <input type="number" step="0.1" value="${S.weeklyRatePct}" style="width:90px;" onchange="S.weeklyRatePct=Math.max(0,Number(this.value)||0);save();">
+      <span>%</span>
+    </div>
+    <div class="settingline">
+      <span class="grow">PIN変更</span>
+      <input type="text" inputmode="numeric" maxlength="4" placeholder="${S.pin}" style="width:100px;" onchange="if(/^\\d{4}$/.test(this.value)){S.pin=this.value;save();alert('PINを変更しました');}else alert('4桁の数字で');">
+    </div>
+    <div class="small" style="margin-top:8px;">参考: 週0.5% ≒ 年約30%。教育用に高めの設定。銘柄の配当は でんしゃ2%・おさかな1.5%(4週毎)。</div>
+  </div>
+  <div class="card">
+    <h2>🧾 履歴管理(取消)</h2>
+    <div class="small">誤操作は「取消」で反対仕訳。株の売買は取消不可(入出金で調整してください)。</div>
+    ${S.tx.slice(0,15).map(t=>`
+      <div class="txline">
+        <span class="txico">${t.ico}</span>
+        <span class="txmemo">${esc(t.memo)}<br><span class="small">${t.date}${t.cancelled?" <b>[取消済]</b>":""}</span></span>
+        <span class="txamt ${t.amt>=0?'pos':'neg'}">${t.amt>=0?"+":""}${yen(t.amt)}</span>
+        ${(!t.cancelled&&["allowance","interest","dividend","parentAdd","parentSub","deposit","withdraw"].includes(t.type))?`<button style="padding:6px 10px;font-size:12px;" onclick="cancelTx(${t.id})">取消</button>`:""}
+      </div>`).join("")}
+  </div>
+  <div class="card">
+    <h2>💾 バックアップ</h2>
+    <div class="small">localStorage保存のため、ブラウザデータ削除で消えます。定期的にエクスポート推奨。</div>
+    <div class="row" style="margin:10px 0;">
+      <button class="grow" onclick="document.getElementById('bk').value=JSON.stringify(S)">エクスポート</button>
+      <button class="grow" onclick="importData()">インポート</button>
+    </div>
+    <textarea id="bk" placeholder="エクスポートを押すとここにデータが出ます。コピーして保管してください。"></textarea>
+    <button class="red" style="margin-top:10px;" onclick="if(confirm('全データを削除します。本当によろしいですか?')&&confirm('この操作は元に戻せません。実行しますか?')){localStorage.removeItem(LS_KEY);load();render();}">全データリセット</button>
+  </div>
+  <button class="primary" style="width:100%;" onclick="PARENT=false;TAB='home';render();">👦 子供画面にもどる</button>`;
+}
+window.parentMoney=function(sign){
+  const a=Math.floor(Number(document.getElementById("pAmt").value));
+  const memo=document.getElementById("pMemo").value.trim();
+  if(!a||a<=0){alert("金額を入力してください");return;}
+  const d=todayStr();
+  if(sign>0){S.wallet+=a;addTx(d,"parentAdd","💵",memo||"おうちの人から",a);}
+  else{
+    if(a>S.wallet){alert("さいふ残高("+yen(S.wallet)+")を超えています。貯金から出す場合は先に子供画面で「おろす」操作を。");return;}
+    S.wallet-=a;addTx(d,"parentSub","🛍️",memo||"つかった(現金化)",-a);
+  }
+  save();render();
+};
+window.cancelTx=function(id){
+  const t=S.tx.find(x=>x.id===id);
+  if(!t||t.cancelled)return;
+  if(!confirm("この取引を取り消しますか?\n"+t.memo))return;
+  if(t.type==="deposit"){S.savings-=t.moveAmt;S.wallet+=t.moveAmt;}
+  else if(t.type==="withdraw"){S.wallet-=t.moveAmt;S.savings+=t.moveAmt;}
+  else if(t.type==="interest"){S.savings-=t.amt;S.totalInterest-=t.amt;}
+  else if(t.type==="dividend"){S.wallet-=t.amt;S.totalDividend-=t.amt;}
+  else{S.wallet-=t.amt;}
+  t.cancelled=true;
+  save();render();
+};
+window.importData=function(){
+  try{
+    const v=document.getElementById("bk").value.trim();
+    if(!v){alert("テキスト欄にバックアップデータを貼り付けてください");return;}
+    const obj=JSON.parse(v);
+    if(typeof obj.wallet!=="number"||!Array.isArray(obj.tx))throw 0;
+    if(!confirm("現在のデータを上書きします。よろしいですか?"))return;
+    S=obj;save();render();alert("インポートしました");
+  }catch(e){alert("データ形式が不正です");}
+};
+
+/* ---------- モーダル ---------- */
+function openModal(html){modalRoot.innerHTML=`<div class="overlay" onclick="if(event.target===this)closeModal()"><div class="modal">${html}</div></div>`;}
+window.closeModal=function(){modalRoot.innerHTML="";};
+
+/* ================= 起動 ================= */
+load();
+buildMarket(dayIndex(todayStr()));
+processDays();
+render();
+</script>
+</body>
+</html>
