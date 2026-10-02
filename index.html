@@ -100,6 +100,12 @@ input[type=number], input[type=text], input[type=password], select{
 .badge-up{color:var(--green); font-weight:900;}
 .badge-down{color:var(--red); font-weight:900;}
 textarea{width:100%; height:110px; font-family:monospace; font-size:11px; border:2px solid var(--line); border-radius:10px; padding:8px;}
+.choice{display:block; width:100%; text-align:left; margin-top:10px; font-size:17px; line-height:1.5;}
+.choice.ok{background:#CDEEDB; border-color:var(--green);}
+.choice.ng{background:#FBDCD2; border-color:var(--red);}
+.choice.dim{opacity:.45;}
+.qtext{font-size:19px; line-height:1.7; font-weight:900;}
+.stars{font-size:12px; letter-spacing:1px; color:var(--gold);}
 .coin{display:inline-block; animation:pop .4s ease;}
 @keyframes pop{0%{transform:scale(.5);}70%{transform:scale(1.15);}100%{transform:scale(1);}}
 @media (prefers-reduced-motion: reduce){ .coin{animation:none;} }
@@ -227,6 +233,7 @@ function initSync(){
             const localEmpty = S.tx.length===0 && S.wallet===0 && S.savings===0;
             if(localEmpty || !S.updatedAt || remote.updatedAt>S.updatedAt){
               S=remote;
+              migrate();
               localStorage.setItem(LS_KEY,JSON.stringify(S));
               if(done)render();
             }
@@ -257,12 +264,23 @@ function defaultState(){
     lastProcessed: todayStr(),
     tx:[], holdings:{}, // holdings[id]={shares,cost}
     tsumitate:{on:false, stock:"train", shares:1},
-    totalInterest:0, totalDividend:0, nextId:1
+    totalInterest:0, totalDividend:0, nextId:1,
+    quiz:{box:{},days:{},log:[]}, quizRewardOn:true, quizRewardYen:10, quizRewardMax:3
   };
+}
+/* v1データを壊さず新フィールドだけ補う（v1.5） */
+function migrate(){
+  if(!S||typeof S!=="object")return;
+  if(!S.quiz||typeof S.quiz!=="object")S.quiz={box:{},days:{},log:[]};
+  if(!S.quiz.box)S.quiz.box={}; if(!S.quiz.days)S.quiz.days={}; if(!Array.isArray(S.quiz.log))S.quiz.log=[];
+  if(S.quizRewardOn==null)S.quizRewardOn=true;
+  if(S.quizRewardYen==null)S.quizRewardYen=10;
+  if(S.quizRewardMax==null)S.quizRewardMax=3;
 }
 function load(){
   try{const raw=localStorage.getItem(LS_KEY); S = raw?JSON.parse(raw):defaultState();}
   catch(e){S=defaultState();}
+  migrate();
 }
 function save(){
   S.updatedAt=Date.now();
@@ -333,6 +351,164 @@ function recentNews(n){
   return out.slice(0,n);
 }
 
+/* ================= おかねクイズ (v1.5) =================
+   問題は data/quiz.json（同じGitHub Pages上）。localStorageにキャッシュしてオフラインでも動く。
+   箱方式: 正解で段階b+1(上限5)・次回 = 今日+INTERVAL[b] 日 / 不正解で b=0・当日再出題。
+   ごほうび: 1日の最初の quizRewardMax 正解まで quizRewardYen 円を「ちょきん」へ。          */
+const QUIZ_URL="data/quiz.json", QUIZ_CACHE="kouki-bank-quiz";
+const THEMES={use:"つかう",interest:"りし",compound:"ふくり",stock:"かぶ",fee:"てすうりょう"};
+const THEME_ORDER=["use","interest","compound","stock","fee"];
+const INTERVAL=[0,1,3,7,14,30];
+let QZ={data:null,cur:null,choices:[],phase:"q",picked:null,reward:0,sessionOk:0,sessionN:0,recent:[]};
+function loadQuizData(){
+  try{const c=JSON.parse(localStorage.getItem(QUIZ_CACHE));if(c&&Array.isArray(c.q)&&c.q.length)QZ.data=c.q;}catch(e){}
+  fetch(QUIZ_URL,{cache:"no-cache"}).then(r=>r.ok?r.json():Promise.reject()).then(j=>{
+    if(Array.isArray(j)&&j.length){
+      const changed=!QZ.data||QZ.data.length!==j.length;
+      QZ.data=j;localStorage.setItem(QUIZ_CACHE,JSON.stringify({q:j}));
+      if(changed&&!PARENT&&(TAB==="home"||(TAB==="quiz"&&!QZ.cur)))render();
+    }
+  }).catch(()=>{});
+}
+function addDays(s,n){return dateOfIndex(dayIndex(s)+n);}
+function quizToday(){
+  const t=todayStr();
+  if(!S.quiz.days[t]){
+    S.quiz.days[t]={ok:0,n:0,rewarded:0};
+    const keys=Object.keys(S.quiz.days).sort();
+    while(keys.length>120){delete S.quiz.days[keys.shift()];}
+  }
+  return S.quiz.days[t];
+}
+function quizDue(){const t=todayStr();return QZ.data?QZ.data.filter(q=>{const b=S.quiz.box[q.id];return b&&b.next<=t;}):[];}
+function quizUnseen(){return QZ.data?QZ.data.filter(q=>!S.quiz.box[q.id]):[];}
+function shuffle(a){const r=a.slice();for(let i=r.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[r[i],r[j]]=[r[j],r[i]];}return r;}
+function pickQuestion(){
+  const notRecent=q=>!QZ.recent.includes(q.id);
+  const due=quizDue().sort((a,b)=>S.quiz.box[a.id].next<S.quiz.box[b.id].next?-1:1);
+  let pool=due.filter(notRecent);
+  if(pool.length)return {q:pool[0],mode:"review"};
+  const unseen=quizUnseen().sort((a,b)=>a.lv-b.lv||THEME_ORDER.indexOf(a.theme)-THEME_ORDER.indexOf(b.theme));
+  pool=unseen.filter(notRecent);
+  if(pool.length)return {q:pool[0],mode:"new"};
+  if(due.length)return {q:due[0],mode:"review"};
+  const all=QZ.data.filter(notRecent); const src=all.length?all:QZ.data;
+  return {q:src[Math.floor(Math.random()*src.length)],mode:"practice"};
+}
+window.quizAnswer=function(idx){
+  if(QZ.phase!=="q"||!QZ.cur)return;
+  const q=QZ.cur, choice=QZ.choices[idx], correct=choice===q.a, t=todayStr();
+  const b=S.quiz.box[q.id]||{b:0,next:t,ok:0,ng:0};
+  if(correct){b.b=Math.min(5,b.b+1);b.next=addDays(t,INTERVAL[b.b]);b.ok++;}
+  else{b.b=0;b.next=t;b.ng++;}
+  S.quiz.box[q.id]=b;
+  const day=quizToday(); day.n++; QZ.sessionN++;
+  let reward=0;
+  if(correct){
+    day.ok++; QZ.sessionOk++;
+    if(S.quizRewardOn&&S.quizRewardYen>0&&day.rewarded<S.quizRewardMax){
+      reward=S.quizRewardYen; day.rewarded++; S.savings+=reward;
+      addTx(t,"quiz","🧠","クイズせいかい ごほうび (ちょきんへ)",reward);
+    }
+  }
+  S.quiz.log.unshift({date:t,qid:q.id,theme:q.theme,ok:correct});
+  if(S.quiz.log.length>500)S.quiz.log.length=500;
+  QZ.phase="a"; QZ.picked=idx; QZ.reward=reward;
+  QZ.recent.push(q.id); if(QZ.recent.length>3)QZ.recent.shift();
+  save(); render();
+};
+window.quizNext=function(){QZ.cur=null;QZ.phase="q";QZ.picked=null;QZ.reward=0;render();};
+function quizStats(){
+  const log=S.quiz.log, out={total:log.length,ok:log.filter(x=>x.ok).length,themes:{}};
+  THEME_ORDER.forEach(th=>{const l=log.filter(x=>x.theme===th);out.themes[th]={n:l.length,ok:l.filter(x=>x.ok).length};});
+  const boxes=Object.values(S.quiz.box);
+  out.seen=boxes.length; out.mastered=boxes.filter(b=>b.b>=3).length;
+  return out;
+}
+function renderQuiz(){
+  const back=`<button class="ghost" onclick="goTab('home')">← もどる</button>`;
+  if(!QZ.data){
+    app.innerHTML=`${back}<h1 style="margin-top:10px;">🧠 おかねクイズ</h1>
+    <div class="card centered"><div style="font-size:40px;">📡</div><div class="small">もんだいを よみこんでいるよ…<br>インターネットに つないで、もういちど ひらいてね。</div></div>`;
+    return;
+  }
+  if(!QZ.cur){const p=pickQuestion();QZ.cur=p.q;QZ.mode=p.mode;QZ.choices=shuffle([p.q.a,...p.q.d]);QZ.phase="q";QZ.picked=null;}
+  const q=QZ.cur, day=quizToday(), b=S.quiz.box[q.id], left=Math.max(0,S.quizRewardMax-day.rewarded);
+  const stage=b?b.b:0;
+  const modeLabel=QZ.mode==="review"?"ふくしゅう":QZ.mode==="new"?"あたらしい":"れんしゅう";
+  const ansDone=QZ.phase==="a";
+  const correct=ansDone&&QZ.choices[QZ.picked]===q.a;
+  app.innerHTML=`
+  <div class="row">${back}<span class="grow"></span><span class="pill gold">きょう ${day.ok}もん せいかい</span></div>
+  <h1 style="margin-top:10px;">🧠 おかねクイズ</h1>
+  ${S.quizRewardOn&&S.quizRewardYen>0?`<div class="small" style="margin:-6px 4px 10px;">せいかいで ちょきんに +${yen(S.quizRewardYen)}（きょう あと ${left}かい）</div>`:""}
+  <div class="card">
+    <div class="row" style="margin-bottom:8px;">
+      <span class="pill blue">${THEMES[q.theme]||q.theme}</span>
+      <span class="pill">レベル${q.lv}</span>
+      <span class="pill">${modeLabel}</span>
+      <span class="grow"></span>
+      <span class="stars">${"★".repeat(stage)}${"☆".repeat(5-stage)}</span>
+    </div>
+    <div class="qtext">${esc(q.q)}</div>
+    ${QZ.choices.map((c,i)=>{
+      let cls="choice";
+      if(ansDone){ if(c===q.a)cls+=" ok"; else if(i===QZ.picked)cls+=" ng"; else cls+=" dim"; }
+      return `<button class="${cls}" ${ansDone?"disabled":""} onclick="quizAnswer(${i})">${["🅰","🅱","🅲"][i]} ${esc(c)}</button>`;
+    }).join("")}
+  </div>
+  ${ansDone?`
+  <div class="card" style="background:${correct?'#EAF7EF':'#FDF0EC'};">
+    <h2>${correct?"🎉 せいかい!":"😢 ざんねん…"} ${correct&&QZ.reward?`<span class="coin">🪙</span> <span class="pos">+${yen(QZ.reward)} ちょきんへ</span>`:""}</h2>
+    ${!correct?`<div style="margin-bottom:6px;">こたえは <b>「${esc(q.a)}」</b></div>`:""}
+    <div style="font-size:15px; line-height:1.8;">${esc(q.ex)}</div>
+    ${correct?`<div class="small" style="margin-top:8px;">つぎに でるのは ${INTERVAL[stage]===0?"きょう":INTERVAL[stage]+"日ご"}。わすれたころに もういちど きくよ。</div>`:`<div class="small" style="margin-top:8px;">まちがえた もんだいは きょう もういちど でるよ。</div>`}
+  </div>
+  <div class="row">
+    <button class="ghost grow" onclick="goTab('home')">おわる</button>
+    <button class="primary grow" onclick="quizNext()">つぎの もんだい →</button>
+  </div>`:""}
+  <div class="hint" style="margin-top:14px;">📚 ふくしゅう ${quizDue().length}もん ・ あたらしい ${quizUnseen().length}もん ・ ぜんぶで ${QZ.data.length}もん</div>`;
+}
+
+/* ================= 買い物きろく (v1.5) =================
+   子が「つかった」を記録 → 即さいふから引く → 親が管理画面で事後チェック（却下で返金） */
+const SPEND_ICONS=["🍬","🧃","📚","🎮","⚽","🎁","🚌","❓"];
+let SP_ICO="🍬";
+window.openSpendModal=function(){
+  SP_ICO="🍬";
+  openModal(`
+    <h2>🛍️ おかねを つかった</h2>
+    <div class="small">さいふに ${yen(S.wallet)} あるよ。なにに つかった?</div>
+    <div class="row wrapme" id="spIcons" style="margin-top:8px;">
+      ${SPEND_ICONS.map(e=>`<button style="padding:6px 10px;font-size:22px;" class="${e===SP_ICO?'primary':''}" onclick="selSpendIco('${e}')">${e}</button>`).join("")}
+    </div>
+    <input type="text" id="spMemo" placeholder="なにを かった?" style="margin-top:10px;font-size:18px;">
+    <input type="number" id="spAmt" placeholder="いくら?" min="1" max="${S.wallet}" style="margin-top:10px;">
+    <div class="numpadrow">
+      ${[100,300,500].map(v=>`<button onclick="document.getElementById('spAmt').value=${v}">${yen(v)}</button>`).join("")}
+    </div>
+    <div class="row" style="margin-top:14px;">
+      <button class="ghost grow" onclick="closeModal()">やめる</button>
+      <button class="primary grow" onclick="doSpend()">きろくする</button>
+    </div>`);
+};
+window.selSpendIco=function(e){
+  SP_ICO=e;
+  document.querySelectorAll("#spIcons button").forEach(b=>b.className=(b.textContent===e?"primary":""));
+};
+window.doSpend=function(){
+  const a=Math.floor(Number(document.getElementById("spAmt").value));
+  const memo=document.getElementById("spMemo").value.trim();
+  if(!a||a<=0){alert("いくら つかったか いれてね");return;}
+  if(a>S.wallet){alert("さいふのお金より おおいよ。おうちの人に きいてね");return;}
+  S.wallet-=a;
+  addTx(todayStr(),"spend",SP_ICO,memo||"つかった",-a);
+  S.tx[0].checked=false;
+  save();closeModal();render();
+};
+window.parentSpendOk=function(id){const t=S.tx.find(x=>x.id===id);if(!t)return;t.checked=true;save();render();};
+
 /* ================= 画面描画 ================= */
 let TAB="home", DETAIL=null, PARENT=false;
 const app=document.getElementById("app");
@@ -347,6 +523,7 @@ function render(){
   else if(TAB==="book")renderBook();
   else if(TAB==="save")renderSave();
   else if(TAB==="stock")renderStock();
+  else if(TAB==="quiz")renderQuiz();
 }
 function renderTabs(){
   const tabs=[["home","🏠","ホーム"],["book","📖","おこづかい帳"],["save","🐷","ちょきん"],["stock","📈","かぶ"],["parent","🔒","おうちの人"]];
@@ -355,6 +532,7 @@ function renderTabs(){
 }
 window.goTab=function(t){
   if(t==="parent"){openPinModal();return;}
+  if(t!=="quiz"){QZ.cur=null;QZ.phase="q";}
   PARENT=false;TAB=t;DETAIL=null;render();
 };
 
@@ -362,11 +540,26 @@ window.goTab=function(t){
 function renderHome(){
   const news=recentNews(4);
   const sv=stockValue();
+  const day=quizToday(), left=Math.max(0,S.quizRewardMax-day.rewarded);
+  const quizInfo=QZ.data
+    ?`きょう ${day.ok}もん せいかい ・ ふくしゅう ${quizDue().length}もん ・ あたらしい ${quizUnseen().length}もん`
+    :"もんだいを よみこみ中…";
   app.innerHTML=`
   <h1>🏦 こうき ぎんこう</h1>
   <div class="card centered" style="background:#FFF9E8;">
     <div class="small">こうきの ぜんぶのお金</div>
     <div class="big-amount"><span class="coin">🪙</span> ${yen(totalAssets())}</div>
+  </div>
+  <div class="card" style="background:#EEF3FF; cursor:pointer;" onclick="goTab('quiz')">
+    <div class="row">
+      <span style="font-size:32px;">🧠</span>
+      <div class="grow">
+        <div style="font-weight:900;">おかねクイズ</div>
+        <div class="small">${quizInfo}</div>
+        ${S.quizRewardOn&&S.quizRewardYen>0?`<div class="small">せいかいで ちょきんに +${yen(S.quizRewardYen)}（きょう あと ${left}かい）</div>`:""}
+      </div>
+      <button class="primary">やる</button>
+    </div>
   </div>
   <div class="row">
     <div class="card grow centered" onclick="goTab('book')">
@@ -382,6 +575,7 @@ function renderHome(){
       <div class="mid-amount">${yen(sv)}</div>
     </div>
   </div>
+  <button class="red" style="width:100%; margin-bottom:14px;" onclick="openSpendModal()">🛍️ おかねを つかった（きろく）</button>
   <div class="card">
     <h2>📅 つぎのよてい</h2>
     <div class="txline"><span class="txico">💰</span><span class="txmemo">おこづかい ${S.allowanceOn?yen(S.weeklyAllowance):"(おやすみ中)"}</span><span class="pill blue">${fmtDate(nextMondayStr())} 月よう日</span></div>
@@ -404,7 +598,7 @@ function renderBook(){
     ${list.length?list.map(t=>`
       <div class="txline">
         <span class="txico">${t.ico}</span>
-        <span class="txmemo">${esc(t.memo)}<br><span class="small">${fmtDate(t.date)}</span></span>
+        <span class="txmemo">${esc(t.memo)}<br><span class="small">${fmtDate(t.date)}${t.type==="spend"?(t.checked?" ✅":" <span class='pill' style='font-size:10px;'>⏳ おうちの人の チェックまち</span>"):""}</span></span>
         <span class="txamt ${t.amt>0?'pos':t.amt<0?'neg':''}">${t.amt===0?"↔":(t.amt>0?"+":"")+yen(t.amt)}</span>
       </div>`).join(""):'<div class="small centered">まだ なにも ないよ。おこづかいを まっててね!</div>'}
   </div>`;
@@ -643,8 +837,49 @@ window.checkPin=function(){
   else alert("PINが ちがいます");
 };
 function renderParent(){
+  const pending=S.tx.filter(t=>t.type==="spend"&&!t.cancelled&&!t.checked);
+  const qs=quizStats();
+  const rate=(ok,n)=>n?Math.round(ok/n*100)+"%":"—";
+  let weak=null;
+  THEME_ORDER.forEach(th=>{const x=qs.themes[th];if(x.n>=3&&(!weak||x.ok/x.n<qs.themes[weak].ok/qs.themes[weak].n))weak=th;});
   app.innerHTML=`
   <h1>🔧 管理画面(親用)</h1>
+  <div class="card" style="${pending.length?'background:#FFF6DC;':''}">
+    <h2>🛍️ 買い物チェック ${pending.length?`<span class="pill gold">${pending.length}件</span>`:""}</h2>
+    <div class="small">子供が「つかった」で記録した買い物。記録時点でさいふから引かれている。OKで確定、却下で返金。</div>
+    ${pending.length?pending.map(t=>`
+      <div class="txline">
+        <span class="txico">${t.ico}</span>
+        <span class="txmemo">${esc(t.memo)}<br><span class="small">${t.date}</span></span>
+        <span class="txamt neg">${yen(t.amt)}</span>
+        <button class="green" style="padding:6px 10px;font-size:12px;" onclick="parentSpendOk(${t.id})">OK</button>
+        <button class="red" style="padding:6px 10px;font-size:12px;" onclick="cancelTx(${t.id})">却下</button>
+      </div>`).join(""):'<div class="small" style="margin-top:8px;">未チェックの買い物はありません。</div>'}
+  </div>
+  <div class="card">
+    <h2>🧠 おかねクイズ</h2>
+    <div class="settingline">
+      <span class="grow">正解ごほうび（貯金へ）</span>
+      <button class="toggle ${S.quizRewardOn?'on':''}" onclick="S.quizRewardOn=!S.quizRewardOn;save();render();"><span class="knob"></span></button>
+    </div>
+    <div class="settingline">
+      <span class="grow">1正解あたり</span>
+      <input type="number" value="${S.quizRewardYen}" style="width:90px;" onchange="S.quizRewardYen=Math.max(0,Math.floor(Number(this.value)||0));save();">
+      <span>円</span>
+    </div>
+    <div class="settingline">
+      <span class="grow">1日のごほうび上限</span>
+      <input type="number" value="${S.quizRewardMax}" style="width:90px;" onchange="S.quizRewardMax=Math.max(0,Math.floor(Number(this.value)||0));save();">
+      <span>回</span>
+    </div>
+    <div class="settingline"><span class="grow">累計回答</span><b>${qs.total}問 ／ 正解率 ${rate(qs.ok,qs.total)}</b></div>
+    <div class="settingline"><span class="grow">定着（★3以上）</span><b>${qs.mastered} / ${QZ.data?QZ.data.length:"?"}問（着手 ${qs.seen}）</b></div>
+    <div style="font-size:13px; margin-top:8px;">
+      ${THEME_ORDER.map(th=>`<span class="pill" style="margin:2px;${th===weak?'background:#FBDCD2;':''}">${THEMES[th]} ${rate(qs.themes[th].ok,qs.themes[th].n)} (${qs.themes[th].n})</span>`).join("")}
+    </div>
+    ${weak?`<div class="small" style="margin-top:6px;">苦手テーマ: <b>${THEMES[weak]}</b>。ぎんこうの日に一緒に話すネタに。</div>`:""}
+    <div class="small" style="margin-top:6px;">問題は <code>data/quiz.json</code>。解き放題だが、ごほうびは1日上限まで。正解は間隔をあけて再出題（1→3→7→14→30日）。</div>
+  </div>
   <div class="card">
     <h2>💴 入金・出金</h2>
     <div class="small">残高 = 親が航暉に支払う義務のある金額。使わせる時は「出金(現金化)」で減らす。</div>
@@ -685,7 +920,7 @@ function renderParent(){
         <span class="txico">${t.ico}</span>
         <span class="txmemo">${esc(t.memo)}<br><span class="small">${t.date}${t.cancelled?" <b>[取消済]</b>":""}</span></span>
         <span class="txamt ${t.amt>=0?'pos':'neg'}">${t.amt>=0?"+":""}${yen(t.amt)}</span>
-        ${(!t.cancelled&&["allowance","interest","dividend","parentAdd","parentSub","deposit","withdraw"].includes(t.type))?`<button style="padding:6px 10px;font-size:12px;" onclick="cancelTx(${t.id})">取消</button>`:""}
+        ${(!t.cancelled&&["allowance","interest","dividend","parentAdd","parentSub","deposit","withdraw","spend","quiz"].includes(t.type))?`<button style="padding:6px 10px;font-size:12px;" onclick="cancelTx(${t.id})">取消</button>`:""}
       </div>`).join("")}
   </div>
   <div class="card">
@@ -730,7 +965,8 @@ window.cancelTx=function(id){
   else if(t.type==="withdraw"){S.wallet-=t.moveAmt;S.savings+=t.moveAmt;}
   else if(t.type==="interest"){S.savings-=t.amt;S.totalInterest-=t.amt;}
   else if(t.type==="dividend"){S.wallet-=t.amt;S.totalDividend-=t.amt;}
-  else{S.wallet-=t.amt;}
+  else if(t.type==="quiz"){S.savings-=t.amt;const d=S.quiz&&S.quiz.days[t.date];if(d&&d.rewarded>0)d.rewarded--;}
+  else{S.wallet-=t.amt;} // spend(負額)は返金になる
   t.cancelled=true;
   save();render();
 };
@@ -741,7 +977,7 @@ window.importData=function(){
     const obj=JSON.parse(v);
     if(typeof obj.wallet!=="number"||!Array.isArray(obj.tx))throw 0;
     if(!confirm("現在のデータを上書きします。よろしいですか?"))return;
-    S=obj;save();render();alert("インポートしました");
+    S=obj;migrate();save();render();alert("インポートしました");
   }catch(e){alert("データ形式が不正です");}
 };
 
@@ -752,6 +988,7 @@ window.closeModal=function(){modalRoot.innerHTML="";};
 /* ================= 起動 ================= */
 load();
 buildMarket(dayIndex(todayStr()));
+loadQuizData();
 render();
 initSync().then(()=>{processDays();render();});
 </script>
